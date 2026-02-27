@@ -1,97 +1,135 @@
 public class MathIA {
+    static double k = 10;
+    static double m = 0.1;
 
-    public static double verletLTE(double k, double m, double t, double dt) {
-            double sum1 = 0.0;
-            for (int j = 2; j <= 50; j++) {
-                sum1 += Math.pow(-1, j) *
-                        Math.pow(k * t * t, j) /
-                        (Math.pow(m, j) * factorial(2 * j));
-            }
+    static double t = 0;
+    static double dt = (double) 1/60;
 
-            double sum2 = 0.0;
-            for (int j = 3; j <= 50; j++) {
-                sum2 += Math.pow(-1, j) *
-                        Math.pow(k * (t - dt) * (t - dt), j) /
-                        (Math.pow(m, j) * factorial(2 * j));
-            }
+    static double xn = 10.0;
+    static double vn = 0.0;
 
-            // inner sum inside the power
-            double inner = 0.0;
-            for (int j = 0; j <= 50; j++) {
-                inner += Math.pow(-1, j) *
-                        Math.pow(k * t * t, j) /
-                        (Math.pow(m, j) * factorial(2 * j));
-            }
+    static double machine_epsilon = Math.pow(2,-52);
+    static int term1max = 0;
+    static int term2max = 0;
 
-            double sum3 = 0.0;
-            for (int i = 2; i <= 50; i++) {
-                sum3 += 2 * Math.pow(2 * inner, 2 * i) *
-                        Math.pow(dt, 2 * i) /
-                        factorial(2 * i);
-            }
+    static double u;
+    static double lte;
 
-            return (2 + (k * dt) / m) * sum1 - 2 * sum2 + 2 * sum3;
+    private static void RungeKutta() {
+        double k1v = vn;
+        double k1a = (-k / m) * xn;
 
+        double k2v = vn + k1a * (dt / 2.0);
+        double k2a = (-k / m) * (xn + k1v * (dt / 2.0));
+
+        double k3v = vn + k2a * (dt / 2.0);
+        double k3a = (-k / m) * (xn + k2v * (dt / 2.0));
+
+        double k4v = vn + k3a * dt;
+        double k4a = (-k / m) * (xn + k3v * dt);
+
+        xn = xn + (dt / 6.0) * (k1v + 2*k2v + 2*k3v + k4v);
+        vn = vn + (dt / 6.0) * (k1a + 2*k2a + 2*k3a + k4a);
     }
 
-    public static double rk4LTE(double k, double m, double t) {
-        double sum1 = 0.0;
-        for (int n = 3; n <= 50; n++) {
-            sum1 += Math.pow(-1, n) *
-                    Math.pow(k * t * t, n) /
-                    (Math.pow(m, n) * factorial(2 * n));
-        }
-
-        double sum2 = 0.0;
-        double sqrtkm = Math.sqrt(k / m);
-
-        for (int n = 2; n <= 50; n++) {
-            sum2 += Math.pow(-1, n) *
-                    Math.pow(k * t * t, n) /
-                    (Math.pow(m, n) * factorial(2 * n + 1)) *
-                    Math.pow(sqrtkm * t, 2 * n + 1);
-        }
-
-        return 16 * sum1 - 8 * sqrtkm * sum2;
+    private static double calculateRoundingError() {
+        return t * machine_epsilon * xn / dt;
     }
 
-    public static double factorial(int n) {
-        double result = 1.0;
-        for (int i = 2; i <= n; i++) {
-            result *= i;
+    public static double calculateLTE() {
+        double sum1 = 0;
+        double sum2 = 0;
+        double sqrtKM = Math.sqrt(k / m);
+
+        for (int j = 3; j <= term1max; j++) {
+            double term1 = (xn * Math.pow(-1, j) / factorial(2 * j))
+                    * Math.pow(sqrtKM, 2 * j)
+                    * Math.pow(dt, 2 * j);
+            sum1 += term1;
         }
-        return result;
+        for ( int j = 2; j < term2max; j++ ) {
+            double term2 = (vn * Math.pow(-1, j) / factorial(2 * j + 1))
+                    * Math.pow(sqrtKM, 2 * j)
+                    * Math.pow(dt, 2 * (j+1));
+            sum2 += term2;
+        }
+
+        return t * (sum1 + sum2);
+    }
+
+    private static double factorial(int n) {
+        double res = 1;
+        for (int i = 2; i <= n; i++) res *= i;
+        return res;
+    }
+
+    private static int calculateTerm1MaxJ() {
+        int j = 3;
+        double KM = k / m;
+        double term1;
+
+        do {
+
+            term1 = (xn * Math.pow(-1, j) / factorial(2 * j))
+                    * Math.pow(KM, j)
+                    * Math.pow(dt, 2 * j - 1);
+            j++;
+        }
+        while ( Math.abs(term1) > machine_epsilon && j < 10000 );
+
+        return j;
+    }
+
+    private static int calculateTerm2MaxJ() {
+        int j = 2;
+        double KM = k / m;
+        double term2 = 0;
+
+        do {
+            term2 = (vn * Math.pow(-1, j) / factorial(2 * j + 1))
+                    * Math.pow(KM, j)
+                    * Math.pow(dt, 2 * j);
+            j++;
+        }
+        while ( Math.abs(term2) > machine_epsilon && j < 10000 );
+
+        return j;
+    }
+
+    private static void findTime() {
+        do {
+            t += dt;
+            term1max = calculateTerm1MaxJ();
+            term2max = calculateTerm2MaxJ();
+            RungeKutta();
+            u = calculateRoundingError();
+            lte = calculateLTE();
+        } while ( lte < u );
     }
 
     public static void main(String[] args) {
-        double verletGTE = 0.0;
-        double rk4GTE = 0.0;
-        double t = 0;
-        double m = 4;
-        double k = 100;
-        double dt = 0.2;
-        double increment = 0.1;
-        int n = 0;
-        while( n < 1000 ) {
-            t = 0;
-            verletGTE = 0;
-            rk4GTE = 0;
-            while ( verletGTE == rk4GTE ) {
-
-                verletGTE += verletLTE(k, m, t, dt);
-                rk4GTE += 2 * 4 * rk4LTE(k, m, t);
-                t += dt;
-            }
-            System.out.println("dt:" + dt + " Is RK4's GTE greater than Verlet's GTE? " + (verletGTE < rk4GTE));
-            /*
-            if ( verletGTE < rk4GTE ) {
-                System.out.println("dt when rk4GTE becomes bigger than verletGTE: " + dt + "t:" + t);
-                break;
-            }*/
-            dt += increment;
-            n++;
+        //changing dt
+        while( dt <= 0.1 ) {
+            findTime();
+            System.out.println(dt);
+            dt += 0.015625;
         }
+        //"dt: " + dt
 
+        //changing k
+        /*while( k <= 1000 ) {
+            findTime();
+            System.out.println("k: " + k + ", t: " + t);
+            k += 10;
+        }*/
 
+        //changing dt
+        /*while( m <= 360 ) {
+            findTime();
+            System.out.println("m: " + m + ", t: " + t);
+            m += 0.5;
+        }*/
     }
+
+
 }
