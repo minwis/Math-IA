@@ -1,12 +1,13 @@
 public class MathIA {
     static double k = 10;
-    static double m = 1;
+    static double m = 0.1;
     static double KdivM = k/m;
 
-    static double dt = (double) 1/60;
+    static double dt = (double) 2.0;
 
-    static double xn = 1000.0;
+    static double xn = 10.0;
     static double vn = 0.0;
+    static double E = 0.0;
 
     static double machine_epsilon = Math.pow(2,-52);
     static int term1max = 0;
@@ -96,7 +97,13 @@ public class MathIA {
         return j;
     }
 
-    private static double findTime() {
+    public static double calculateEnergyDrift() {
+        double KE = 0.5 * m * (vn * vn);
+        double PE = 0.5 * k * (xn * xn);
+        return 500-(KE + PE);
+    }
+
+    public static void main(String[] args) {
         double t = dt;
         do {
             RungeKutta();
@@ -104,21 +111,13 @@ public class MathIA {
             term2max = calculateTerm2MaxJ();
             u = calculateRoundingError(t);
             lte = calculateLTE();
+            E = calculateEnergyDrift();
+            //System.out.println(t);
+            //System.out.println(u);
+            //System.out.println(lte);
+            System.out.println(t);
             t += dt;
         } while ( Math.abs(lte) > u );
-
-        return t;
-    }
-
-    public static void main(String[] args) {
-        while (k <= 2000 ) {
-            KdivM = k / m;
-            xn = 10.0;
-            vn = 0.0;
-            double t = findTime();
-            System.out.println(t);
-            k += 10;
-        }
     }
 
 }
