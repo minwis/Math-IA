@@ -1,11 +1,11 @@
 public class MathIA {
     static double k = 10;
-    static double m = 0.1;
+    static double m = 1;
+    static double KdivM = k/m;
 
-    static double t = 0;
     static double dt = (double) 1/60;
 
-    static double xn = 10.0;
+    static double xn = 1000.0;
     static double vn = 0.0;
 
     static double machine_epsilon = Math.pow(2,-52);
@@ -17,29 +17,30 @@ public class MathIA {
 
     private static void RungeKutta() {
         double k1v = vn;
-        double k1a = (-k / m) * xn;
+        double k1a = (-KdivM) * xn;
 
         double k2v = vn + k1a * (dt / 2.0);
-        double k2a = (-k / m) * (xn + k1v * (dt / 2.0));
+        double k2a = (-KdivM) * (xn + k1v * (dt / 2.0));
 
         double k3v = vn + k2a * (dt / 2.0);
-        double k3a = (-k / m) * (xn + k2v * (dt / 2.0));
+        double k3a = (-KdivM) * (xn + k2v * (dt / 2.0));
 
         double k4v = vn + k3a * dt;
-        double k4a = (-k / m) * (xn + k3v * dt);
+        double k4a = (-KdivM) * (xn + k3v * dt);
 
         xn = xn + (dt / 6.0) * (k1v + 2*k2v + 2*k3v + k4v);
         vn = vn + (dt / 6.0) * (k1a + 2*k2a + 2*k3a + k4a);
     }
 
-    private static double calculateRoundingError() {
-        return t * machine_epsilon * xn / dt;
+    private static double calculateRoundingError(double t) {
+        int n = (int) (t / dt);
+        return n * machine_epsilon * xn;
     }
 
     public static double calculateLTE() {
         double sum1 = 0;
         double sum2 = 0;
-        double sqrtKM = Math.sqrt(k / m);
+        double sqrtKM = Math.sqrt(KdivM);
 
         for (int j = 3; j <= term1max; j++) {
             double term1 = (xn * Math.pow(-1, j) / factorial(2 * j))
@@ -47,14 +48,14 @@ public class MathIA {
                     * Math.pow(dt, 2 * j);
             sum1 += term1;
         }
-        for ( int j = 2; j < term2max; j++ ) {
+        for ( int j = 2; j <= term2max; j++ ) {
             double term2 = (vn * Math.pow(-1, j) / factorial(2 * j + 1))
                     * Math.pow(sqrtKM, 2 * j)
                     * Math.pow(dt, 2 * (j+1));
             sum2 += term2;
         }
 
-        return t * (sum1 + sum2);
+        return sum1 + sum2;
     }
 
     private static double factorial(int n) {
@@ -65,14 +66,13 @@ public class MathIA {
 
     private static int calculateTerm1MaxJ() {
         int j = 3;
-        double KM = k / m;
         double term1;
+        double sqrtKM = Math.sqrt(KdivM);
 
         do {
-
             term1 = (xn * Math.pow(-1, j) / factorial(2 * j))
-                    * Math.pow(KM, j)
-                    * Math.pow(dt, 2 * j - 1);
+                    * Math.pow(sqrtKM, 2 * j)
+                    * Math.pow(dt, 2 * j);
             j++;
         }
         while ( Math.abs(term1) > machine_epsilon && j < 10000 );
@@ -82,13 +82,13 @@ public class MathIA {
 
     private static int calculateTerm2MaxJ() {
         int j = 2;
-        double KM = k / m;
-        double term2 = 0;
+        double term2;
+        double sqrtKM = Math.sqrt(KdivM);
 
         do {
             term2 = (vn * Math.pow(-1, j) / factorial(2 * j + 1))
-                    * Math.pow(KM, j)
-                    * Math.pow(dt, 2 * j);
+                    * Math.pow(sqrtKM, 2 * j)
+                    * Math.pow(dt, 2 * (j+1));
             j++;
         }
         while ( Math.abs(term2) > machine_epsilon && j < 10000 );
@@ -96,40 +96,29 @@ public class MathIA {
         return j;
     }
 
-    private static void findTime() {
+    private static double findTime() {
+        double t = dt;
         do {
-            t += dt;
+            RungeKutta();
             term1max = calculateTerm1MaxJ();
             term2max = calculateTerm2MaxJ();
-            RungeKutta();
-            u = calculateRoundingError();
+            u = calculateRoundingError(t);
             lte = calculateLTE();
-        } while ( lte < u );
+            t += dt;
+        } while ( Math.abs(lte) > u );
+
+        return t;
     }
 
     public static void main(String[] args) {
-        //changing dt
-        while( dt <= 0.1 ) {
-            findTime();
-            System.out.println(dt);
-            dt += 0.015625;
-        }
-        //"dt: " + dt
-
-        //changing k
-        /*while( k <= 1000 ) {
-            findTime();
-            System.out.println("k: " + k + ", t: " + t);
+        while (k <= 2000 ) {
+            KdivM = k / m;
+            xn = 10.0;
+            vn = 0.0;
+            double t = findTime();
+            System.out.println(t);
             k += 10;
-        }*/
-
-        //changing dt
-        /*while( m <= 360 ) {
-            findTime();
-            System.out.println("m: " + m + ", t: " + t);
-            m += 0.5;
-        }*/
+        }
     }
-
 
 }
